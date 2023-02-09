@@ -270,8 +270,8 @@ s_exp = np.array([[0.21415391, 0.22854546], [0.26690114, 0.44588503], [0.3257367
 
 deltaUr_3_exp_np = [[0.00193795, 0.00314452], [0.00195132, 0.00320871]]
 deltaVr_3_exp_np = [[0.00103786, 0.00190269, 0.00172727], [0.00109623, 0.0025203, 0.00126202]]
-deltaUz_3_exp_np = [[-0.00942043 -0.01576331], [-0.00216407 -0.00358799]]
-deltaVz_3_exp_np = [[-0.01069625 -0.00785168 -0.00464374], [-0.00094875 -0.00397553 -0.00080911]]
+deltaUz_3_exp_np = [[-0.00942043, -0.01576331], [-0.00216407, -0.00358799]]
+deltaVz_3_exp_np = [[-0.01069625, -0.00785168, -0.00464374], [-0.00094875, -0.00397553, -0.00080911]]
 deltaUh_3_exp_np = [[0.01726854, 0.02951899], [0.00359722, 0.00635103]]
 deltaVh_3_exp_np = [[0.01217558, 0.03100759, 0.01551138], [0.00432377, 0.00515261, 0.00275538]]
 deltaW_GRU_3_exp_np = [[ 0.32036604, 0.47217857], [-0.17640132, -0.25999298], [-0.14396472, -0.21218559]]
@@ -300,13 +300,15 @@ if not np.isclose(s_exp, s, rtol=1e-08, atol=1e-08).all():
 else:
 	print("s passed")
 
-if not np.isclose(deltaUr_3_exp_np, r.deltaUr).all() and \
+
+print("\n### binary prediction GRU with 3 steps")
+if not (np.isclose(deltaUr_3_exp_np, r.deltaUr).all() and \
         np.isclose(deltaVr_3_exp_np, r.deltaVr).all() and \
         np.isclose(deltaUz_3_exp_np, r.deltaUz).all() and \
         np.isclose(deltaVz_3_exp_np, r.deltaVz).all() and \
         np.isclose(deltaUh_3_exp_np, r.deltaUh).all() and \
         np.isclose(deltaVh_3_exp_np, r.deltaVh).all() and \
-        np.isclose(deltaW_GRU_3_exp_np, r.deltaW).all():
+        np.isclose(deltaW_GRU_3_exp_np, r.deltaW).all()):
 	print("    deltaUr expected\n{0}".format(deltaUr_3_exp_np))
 	print("    deltaUr received\n{0}".format(r.deltaUr))
 	print("    deltaVr expected\n{0}".format(deltaVr_3_exp_np))
@@ -322,6 +324,10 @@ if not np.isclose(deltaUr_3_exp_np, r.deltaUr).all() and \
 	print("    deltaW expected\n{0}".format(deltaW_GRU_3_exp_np))
 	print("    deltaW received\n{0}".format(r.deltaW))
 else:
-	print("deltaUr assed\n")
-	print("deltaVr passed\n")
-	print("deltaUz")
+	print("deltaUr passed")
+	print("deltaVr passed")
+	print("deltaUz passed")
+	print("deltaVz passed")
+	print("deltaUh passed")
+	print("deltaVh passed")
+	print("deltaW  passed")

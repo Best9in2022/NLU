@@ -70,6 +70,10 @@ class Runner(object):
 
         ##########################
         # --- your code here --- #
+        y = self.model.predict(x)[0]
+        y_t = y[-1]
+        d_t = make_onehot(d[0], len(y_t))
+        loss+= -np.sum(d_t*np.log(y_t))
         ##########################
 
         return loss
@@ -87,6 +91,9 @@ class Runner(object):
 
         ##########################
         # --- your code here --- #
+        y = self.model.predict(x)[0]
+        if np.argmax(y[-1]) == d[0]:
+            return 1
         ##########################
 
         return 0
@@ -105,9 +112,11 @@ class Runner(object):
 
         ##########################
         # --- your code here --- #
-        for i in range(X.shape[0]):
-            mean_loss+= self.compute_loss(X[i], D[i])/len(X[i]) #mean across words
-        mean_loss = mean_loss/(X.shape[0]) #mean across sentences
+        num_words = 0
+        for i in range(len(X)):
+            mean_loss+= self.compute_loss(X[i], D[i]) 
+            num_words+= len(X[i])
+        mean_loss = mean_loss/(num_words) #mean across words
         ##########################
 
         return mean_loss
@@ -432,6 +441,14 @@ if __name__ == "__main__":
         S_dev = docs_to_indices(docs, word_to_num, 1, 1)
         X_dev, D_dev = seqs_to_lmXY(S_dev)
 
+        # # Load the test set (for tuning hyperparameters)
+        # docs = load_lm_dataset(data_folder + '/wiki-dev.txt')
+        # S_test = docs_to_indices(docs, word_to_num, 1, 1)
+        # X_test, D_test = seqs_to_lmXY(S_test)
+        # X_test = X_test[:train_size]
+        # D_test = D_test[:train_size]
+
+
         X_train = X_train[:train_size]
         D_train = D_train[:train_size]
         X_dev = X_dev[:dev_size]
@@ -446,9 +463,16 @@ if __name__ == "__main__":
         rnn_model = RNN(vocab_size, hdim, len(num_to_word))
         runner_obj = Runner(rnn_model)
         runner_obj.train(X_train, D_train, X_dev, D_dev, learning_rate=lr, back_steps=lookback)
-        np.save("rnn.U.npy", rnn_model._parameters['U'])
-        np.save("rnn.V.npy", rnn_model._parameters['V'])
-        np.save("rnn.W.npy", rnn_model._parameters['W'])
+
+        print('mean loss on dev set:',runner_obj.compute_mean_loss(X_dev, D_dev))
+
+        # test_loss = runner_obj.compute_mean_loss(X_test, D_test)
+        # print('mean loss on testset:',test_loss)
+        # np.save("rnn.U.npy", rnn_model._parameters['U'])
+        # np.save("rnn.V.npy", rnn_model._parameters['V'])
+        # np.save("rnn.W.npy", rnn_model._parameters['W'])
+        # print("Unadjusted: %.03f" % np.exp(test_loss))
+        # print("Adjusted for missing vocab: %.03f" % np.exp(adjust_loss(test_loss, fraction_lost, q)))
         ##########################
 
         run_loss = -1
@@ -490,6 +514,10 @@ if __name__ == "__main__":
         X_train = X_train[:train_size]
         Y_train = D_train[:train_size]
 
+        #Q3
+        #X_train = X_train[:2000]
+        #Y_train = D_train[:2000]
+
         # load development data
         sents = load_np_dataset(data_folder + '/wiki-dev.txt')
         S_dev = docs_to_indices(sents, word_to_num, 0, 0)
@@ -500,6 +528,9 @@ if __name__ == "__main__":
 
         ##########################
         # --- your code here --- #
+        rnn_model = RNN(vocab_size, hdim, 2)
+        runner_obj = Runner(rnn_model)
+        runner_obj.train_np(X_train, D_train, X_dev, D_dev, learning_rate=lr, back_steps=lookback)
         ##########################
 
         acc = 0.
@@ -536,8 +567,8 @@ if __name__ == "__main__":
         S_train = docs_to_indices(sents, word_to_num, 0, 0)
         X_train, D_train = seqs_to_npXY(S_train)
 
-        X_train = X_train[:train_size]
-        Y_train = D_train[:train_size]
+        X_train = X_train[:2000]
+        Y_train = D_train[:2000]
 
         # load development data
         sents = load_np_dataset(data_folder + '/wiki-dev.txt')
@@ -549,6 +580,9 @@ if __name__ == "__main__":
 
         ##########################
         # --- your code here --- #
+        gru_model = GRU(vocab_size, hdim, 2)
+        runner_obj = Runner(gru_model)
+        runner_obj.train_np(X_train, D_train, X_dev, D_dev, learning_rate=lr, back_steps=lookback)
         ##########################
 
         acc = 0.

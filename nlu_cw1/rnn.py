@@ -65,8 +65,8 @@ class RNN(Model):
 			##########################
 			# --- your code here --- #
 			x_t = make_onehot(x[t], self.vocab_size) #make x[t] to one-hot
-			s[t+1] = sigmoid(self.V@x_t+ self.U@s[t])
-			y[t] = softmax(self.W@s[t+1])
+			s[t] = sigmoid(self.V@x_t+ self.U@s[t-1])
+			y[t] = softmax(self.W@s[t])
 			##########################
 
 		return y, s
@@ -93,8 +93,8 @@ class RNN(Model):
 			d_t = make_onehot(d[t], self.out_vocab_size) #make ont-hot vector for d_t
 			deltaOut = d_t - y[t]  #(v,1)
 			self.deltaW+= np.outer(deltaOut, s[t]) #(v,h)
-			deltaIn = self.W.T@deltaOut*s[t]*(1 - s[t])  #(h,v)@(v,1)*(h,1)
-			x_t = make_onehot(x[t], self.out_vocab_size) 
+			deltaIn = self.W.T@deltaOut*grad(s[t]) #(h,v)@(v,1)*(h,1)
+			x_t = make_onehot(x[t], self.vocab_size) 
 			self.deltaV+= np.outer(deltaIn, x_t)   #(h,v)
 			self.deltaU+= np.outer(deltaIn, s[t-1]) #(h,h)
 			##########################
@@ -119,6 +119,14 @@ class RNN(Model):
 
 		##########################
 		# --- your code here --- #
+		t = len(x) - 1
+		d_t = make_onehot(d[0], self.out_vocab_size) #make ont-hot vector for d_t
+		deltaOut = d_t - y[t]  #(v,1)
+		self.deltaW+= np.outer(deltaOut, s[t]) #(v,h)
+		deltaIn = self.W.T@deltaOut*grad(s[t]) #(h,v)@(v,1)*(h,1)
+		x_t = make_onehot(x[t], self.vocab_size) 
+		self.deltaV+= np.outer(deltaIn, x_t)   #(h,v)
+		self.deltaU+= np.outer(deltaIn, s[t-1]) #(h,h)
 		##########################
 		
 	def acc_deltas_bptt(self, x, d, y, s, steps):
@@ -145,20 +153,19 @@ class RNN(Model):
 			d_t = make_onehot(d[t], self.out_vocab_size) #make ont-hot vector for d_t
 			deltaOut = d_t - y[t]  #(v,1)
 			self.deltaW+= np.outer(deltaOut, s[t]) #(v,h)
-			deltaIn = self.W.T@deltaOut*s[t]*(1 - s[t])  #(h,v)@(v,1)*(h,1)
-			x_t = make_onehot(x[t], self.out_vocab_size) 
+			deltaIn = self.W.T@deltaOut*grad(s[t])  #(h,v)@(v,1)*(h,1)
+			x_t = make_onehot(x[t], self.vocab_size) 
 			self.deltaV+= np.outer(deltaIn, x_t)   #(h,v)
 			self.deltaU+= np.outer(deltaIn, s[t-1]) #(h,h)
 
-			if steps!=0:
-				for T in range(1,steps+1):
-					if t-T-1>=0: 
-						#the lower bound is 0
-						deltaIn_T = self.U.T@deltaIn*s[t-T]*(1 - s[t-T])   #(h,h)
-						x_T = make_onehot(x[t-T], self.out_vocab_size)
-						self.deltaV+= np.outer(deltaIn_T, x_T)
-						self.deltaU+= np.outer(deltaIn_T, s[t-T-1])
-						deltaIn =  deltaIn_T 
+			for T in range(1,steps+1):
+				if t-T-1>=-1: 
+					#the lower bound is -1
+					deltaIn_T = self.U.T@deltaIn*grad(s[t-T])   # U * upper_layer_acti * current_layer_acti 
+					x_T = make_onehot(x[t-T], self.vocab_size)
+					self.deltaV+= np.outer(deltaIn_T, x_T)
+					self.deltaU+= np.outer(deltaIn_T, s[t-T-1])
+					deltaIn =  deltaIn_T 
 			##########################
 
 
@@ -182,5 +189,22 @@ class RNN(Model):
 		'''
 
 		##########################
-		# --- your code here --- #
+		#--- your code here --- #
+		t = len(x) - 1 
+		d_t = make_onehot(d[0], self.out_vocab_size) #make ont-hot vector for d_t
+		deltaOut = d_t - y[t]  #(v,1)
+		self.deltaW+= np.outer(deltaOut, s[t]) #(v,h)
+		deltaIn = self.W.T@deltaOut*grad(s[t])  #(h,v)@(v,1)*(h,1)
+		x_t = make_onehot(x[t], self.vocab_size) 
+		self.deltaV+= np.outer(deltaIn, x_t)   #(h,v)
+		self.deltaU+= np.outer(deltaIn, s[t-1]) #(h,h)
+
+		for T in range(1,steps+1):
+			if t-T-1>=-1: 
+				#the lower bound is -1
+				deltaIn_T = self.U.T@deltaIn*grad(s[t-T])   # U * upper_layer_acti * current_layer_acti 
+				x_T = make_onehot(x[t-T], self.vocab_size)
+				self.deltaV+= np.outer(deltaIn_T, x_T)
+				self.deltaU+= np.outer(deltaIn_T, s[t-T-1])
+				deltaIn =  deltaIn_T 
 		##########################
