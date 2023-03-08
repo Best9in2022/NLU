@@ -42,7 +42,6 @@ class Model(object):
         else:
             super().__setattr__(name, value)
 
-
     def __getattr__(self, name):
 
         if '_parameters' in self.__dict__:

@@ -9,6 +9,7 @@ from sys import stdout
 from model import Model
 from rnn import RNN
 from gru import GRU
+from rnnTEST import RNNTEST
 
 
 class Runner(object):
@@ -258,7 +259,7 @@ class Runner(object):
 
         return best_loss
 
-    def train_np(self, X, D, X_dev, D_dev, epochs=10, learning_rate=0.5, anneal=5, back_steps=0, batch_size=100,
+    def train_np(self, X, D, X_dev, D_dev, epochs=30, learning_rate=0.5, anneal=5, back_steps=0, batch_size=100,
                  min_change=0.0001, log=True):
         '''
         train the model on some training set X, D while optimizing the loss on a dev set X_dev, D_dev
@@ -522,18 +523,23 @@ if __name__ == "__main__":
         X_dev = X_dev[:dev_size]
         D_dev = D_dev[:dev_size]
 
+        # Load the test set (for tuning hyperparameters)
+        sents = load_np_dataset(data_folder + '/wiki-test.txt')
+        S_test = docs_to_indices(sents, word_to_num, 0, 0)
+        X_test, D_test = seqs_to_npXY(S_test)
+        
 
         print(np.max([len(x) for x in X_dev]))
         ##########################
         # --- your code here --- #
-        rnn_model = RNN(vocab_size, hdim, 2)
+        rnn_model = RNNTEST(vocab_size, hdim, 2)
         runner_obj = Runner(rnn_model)
         runner_obj.train_np(X_train, D_train, X_dev, D_dev, learning_rate=lr, back_steps=lookback)
         ##########################
 
-        acc = 0.
 
-        print("Accuracy: %.03f" % acc)
+        acc_test = sum([runner_obj.compute_acc_np(X_test[i], D_test[i]) for i in range(len(X_test))]) / len(X_test)
+        print("Accuracy: %.03f" % acc_test)
 
     if mode == "train-np-gru":
         '''
@@ -573,24 +579,21 @@ if __name__ == "__main__":
         S_dev = docs_to_indices(sents, word_to_num, 0, 0)
         X_dev, D_dev = seqs_to_npXY(S_dev)
 
+        X_dev = X_dev[:dev_size]
+        D_dev = D_dev[:dev_size]
+
         # Load the test set (for tuning hyperparameters)
         sents = load_np_dataset(data_folder + '/wiki-test.txt')
         S_test = docs_to_indices(sents, word_to_num, 0, 0)
         X_test, D_test = seqs_to_npXY(S_test)
-
-        X_dev = X_dev[:dev_size]
-        D_dev = D_dev[:dev_size]
 
         ##########################
         # --- your code here --- #
         gru_model = GRU(vocab_size, hdim, 2)
         runner_obj = Runner(gru_model)
         runner_obj.train_np(X_train, D_train, X_dev, D_dev, learning_rate=lr, back_steps=lookback)
-        
-        acc_test = sum([runner_obj.compute_acc_np(X_test[i], D_test[i]) for i in range(len(X_test))]) / len(X_test)
-        print(acc_test)
         ##########################
 
-        acc = 0.
+        acc_test = sum([runner_obj.compute_acc_np(X_test[i], D_test[i]) for i in range(len(X_test))]) / len(X_test)
 
-        print("Accuracy: %.03f" % acc)
+        print("Accuracy: %.03f" % acc_test)

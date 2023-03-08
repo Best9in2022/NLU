@@ -10,6 +10,16 @@ def softmax(x):
 def grad(x):
 	return x*(1-x)
 
+def grad1(x):
+    x = (x > 0) * 1
+    return x
+
+def relu(x):
+    for i in range(x.shape[0]):
+        if x[i]<0:
+            x[i] = 0
+    return x
+
 def make_onehot(i, n):
 	y = np.zeros(n)
 	y[i] = 1
