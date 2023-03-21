@@ -122,13 +122,28 @@ def main(args):
             1.  Add tensor shape annotation to each of the output tensor
             2.  Add line-by-line description about the following lines of code do.
             '''
-            output, _ = model(sample['src_tokens'], sample['src_lengths'], sample['tgt_inputs'])
-
+            # batch_size, src_time_steps = src_tokens.size()
+            # batch_size, tgt_time_steps = tgt_inputs.size()
+            
+            # forward propogation of the LSTM encoder-decoder model
+            output, _ = model(sample['src_tokens'], sample['src_lengths'], sample['tgt_inputs']) 
+            # output shape: [batch_size, tgt_time_steps, len(target_vocabulary)] or [src_tokens.size(0), tgt_inputs.size(1), len(tgt_inputs)]
+            
+            # compute the average loss per sentence in this data sample (batch)
             loss = \
                 criterion(output.view(-1, output.size(-1)), sample['tgt_tokens'].view(-1)) / len(sample['src_lengths'])
+            # loss shape: [batch_size * src_time_steps]
+            
+            # back propagation
             loss.backward()
+            
+            # computing the gradient norm of the model's parameters and clipping it if it exceeds a specified threshold (args.clip_norm)
             grad_norm = torch.nn.utils.clip_grad_norm_(model.parameters(), args.clip_norm)
+            
+            # one step gradient decent
             optimizer.step()
+            
+            # set all the gradients to zeros
             optimizer.zero_grad()
             '''___QUESTION-1-DESCRIBE-E-END___'''
 
