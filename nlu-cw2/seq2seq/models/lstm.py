@@ -355,12 +355,20 @@ class LSTMDecoder(Seq2SeqDecoder):
             # __QUESTION-4: Incorporate the LEXICAL MODEL into the prediction of target tokens here
             # TODO: --------------------------------------------------------------------- CUT
             context_output = lexical_contexts.transpose(0, 1) # [n, tgt_time_steps, d]
-            context_output = self.lexical_projection(context_output)  # [n, tgt_time_steps, V]
-            
             #normalize
-             
-          
+            #context_output_norm = F.normalize(context_output, p=2, dim=-1)
+            context_output = self.lexical_projection(context_output)  # [n, tgt_time_steps, V]
+            #normalize
+            #decoder_output_norm = torch.cat(rnn_outputs, dim=0).view(tgt_time_steps, batch_size, self.hidden_size)
+            #decoder_output_norm = decoder_output.transpose(0, 1)
+            #decoder_output_norm = F.normalize(decoder_output_norm, p=2, dim=-1)
             decoder_output = decoder_output + context_output
+            
+#             self.linear = nn.Linear(embedding_dim, output_dim)
+#             self.linear.weight.data.normal_(0, 1)  # initialize weights
+#             self.linear.weight.data = F.normalize(self.linear.weight.data, p=2, dim=1)
+#             x = self.linear(x)
+            
             # TODO: --------------------------------------------------------------------- /CUT
 
         return decoder_output, attn_weights
