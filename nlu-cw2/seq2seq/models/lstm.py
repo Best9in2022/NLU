@@ -261,7 +261,7 @@ class LSTMDecoder(Seq2SeqDecoder):
         # Recover encoder input
         src_embeddings = encoder_out['src_embeddings']
 
-        src_out, src_hidden_states, src_cell_states = encoder_out['src_out']     # src_out:(src_seq_len, batch_size, hidden_size)
+        src_out, src_hidden_states, src_cell_states = encoder_out['src_out']     #src_out:(src_seq_len, batch_size, hidden_size)
         src_mask = encoder_out['src_mask']
         src_time_steps = src_out.size(0)
 
@@ -322,16 +322,14 @@ class LSTMDecoder(Seq2SeqDecoder):
                 input_feed = tgt_hidden_states[-1]
             else:
                 input_feed, step_attn_weights = self.attention(tgt_hidden_states[-1], src_out, src_mask) #(n, h); (n, t_in)
-                attn_weights[:, j, :] = step_attn_weights   #(n, t_in)
+                attn_weights[:, j, :] = step_attn_weights   #(n, 1, t_in)
 
                 if self.use_lexical_model:
                     # __QUESTION-4: Compute and collect LEXICAL MODEL context vectors here
                     # TODO: --------------------------------------------------------------------- CUT
-                    # src_embeddings[src_time_steps, batch_size, num_features]
-                    # context
                     src_embeddings_copy = src_embeddings.tranpose(0,1) # [n, t_in, d]
-                    scr_context = torch.bmm(step_attn_weights.unsqueeze(1), src_embeddings_copy) # [n, 1, d]
-                    scr_context = nn.tanh(scr_context.unsqueeze(1)) # [n, d]
+                    src_context = torch.bmm(step_attn_weights.unsqueeze(1), src_embeddings_copy) # [n, 1, d]
+                    src_context = nn.tanh(src_context.squeeze(1)) # [n, d]
                     
                     # FFNN + Residual
                     scr_out = nn.tanh(self.lexical_model(src_context)) + src_context
@@ -353,13 +351,12 @@ class LSTMDecoder(Seq2SeqDecoder):
         decoder_output = decoder_output.transpose(0, 1)
 
         # Final projection
-        decoder_output = self.final_projection(decoder_output)  # [n, tgt_time_steps, V]
+        decoder_output = self.final_projection(decoder_output)
 
         if self.use_lexical_model:
             # __QUESTION-4: Incorporate the LEXICAL MODEL into the prediction of target tokens here
             # TODO: --------------------------------------------------------------------- CUT
-            # transfer a list to tensor
-            context_output = torch.cat(lexical_contexts, dim=0).view(tgt_time_steps, batch_size, self.embed_dim)
+            context_output = torch.stack(lexical_contexts)
             context_output = context_output.transpose(0, 1) # [n, tgt_time_steps, d]
             # normalize
             #context_output_norm = F.normalize(context_output, p=2, dim=-1)
@@ -374,7 +371,6 @@ class LSTMDecoder(Seq2SeqDecoder):
 #             self.linear.weight.data.normal_(0, 1)  # initialize weights
 #             self.linear.weight.data = F.normalize(self.linear.weight.data, p=2, dim=1)
 #             x = self.linear(x)
-            
             # TODO: --------------------------------------------------------------------- /CUT
 
         return decoder_output, attn_weights

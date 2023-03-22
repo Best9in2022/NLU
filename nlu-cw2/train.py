@@ -122,10 +122,6 @@ def main(args):
             1.  Add tensor shape annotation to each of the output tensor
             2.  Add line-by-line description about the following lines of code do.
             '''
-            # batch_size, src_time_steps = src_tokens.size()
-            # batch_size, tgt_time_steps = tgt_inputs.size()
-            
-            # forward propogation of the LSTM encoder-decoder model
             output, _ = model(sample['src_tokens'], sample['src_lengths'], sample['tgt_inputs']) 
             # output shape: [batch_size, tgt_time_steps, len(target_vocabulary)] or [src_tokens.size(0), tgt_inputs.size(1), len(tgt_inputs)]
             
