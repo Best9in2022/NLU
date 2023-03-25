@@ -260,7 +260,7 @@ class MultiHeadAttention(nn.Module):
         # 2. compute scaled dot-product
         keys = keys.transpose(1,2)
         # keys.size = [batch_size * self.num_heads, self.head_embed_size, key_len]
-        score = torch.bmm(queries, keys)) / self.head_scaling  # (b*n, q, d) @ (b*n, d, k) / scale
+        score = torch.bmm(queries, keys) / self.head_scaling  # (b*n, q, d) @ (b*n, d, k) / scale
         # score.size = [batch_size * self.num_heads, tgt_time_steps, key_len]
 
         if key_padding_mask is not None:
