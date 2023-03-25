@@ -223,52 +223,76 @@ class MultiHeadAttention(nn.Module):
         # TODO: REPLACE THESE LINES WITH YOUR IMPLEMENTATION ------------------------ CUT
         # attn = torch.zeros(size=(tgt_time_steps, batch_size, embed_dim))
         # attn_weights = torch.zeros(size=(self.num_heads, batch_size, tgt_time_steps, -1)) if need_weights else None
-
-        query = query.transpose(0, 1)  # query: [batch_size, q_len(tgt_time_steps), embed_dim]
-        key = key.transpose(0, 1)  # key: [batch_size, k_len, embed_dim(k_embed_size)]
-        value = value.transpose(0, 1)  # value:[batch_size, v_len, embed_dim(v_embed_size)]
-
-        q_n = self.q_proj(query).view(batch_size, -1, self.num_heads, self.head_embed_size).transpose(1, 2)
-        # q_n: [batch_size, num_heads, q_len(tgt_time_steps), head_embed_size]
-        k_n = self.k_proj(key).view(batch_size, -1, self.num_heads, self.head_embed_size).transpose(1, 2)
-        # k_n: [batch_size, num_heads, k_len, head_embed_size]
-        v_n = self.v_proj(value).view(batch_size, -1, self.num_heads, self.head_embed_size).transpose(1, 2)
-        # v_n: [batch_size, num_heads, v_len, head_embed_size]
         
-        # turn to batch (parallel)
-        queries = q_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)
-        keys = k_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)
-        values = v_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)
+        #1. linear project
+        query = query.transpose(0, 1)  # query.size =  [batch_size, tgt_time_steps, embed_dim]
+        key = key.transpose(0, 1)  # key.size =  [batch_size, key_len, k_embed_size/embed_dim]
+        value = value.transpose(0, 1)  # value.size = [batch_size, value_len, v_embed_size/embed_dim]
 
-        score = torch.bmm(queries, keys.transpose(1,2))  # (b*n, q, d) @ (b*n, d, k)
-        # score: [batch_size * num_heads, q_len(tgt_time_steps), k_len(src_time_steps)]
-        score = score / self.head_scaling # scale
-        score = score.view(batch_size, self.num_heads, tgt_time_steps, keys.size(1))   
-        # score: [batch_size, num_heads, q_len(tgt_time_steps), k_len(src_time_steps)]
+        q_n = self.q_proj(query)
+        # q_n.size =  [batch_size, tgt_time_steps, embed_dim]
+        q_n = q_n.view(batch_size, tgt_time_steps, self.num_heads, self.head_embed_size)
+        # q_n.size =  [batch_size, tgt_time_steps, self.num_heads, self.head_embed_size]
+        q_n = q_n.transpose(1, 2)
+        # q_n.size =  [batch_size, self.num_heads, tgt_time_steps, self.head_embed_size]
+        
+        k_n = self.k_proj(key)
+        # k_n.size =  [batch_size, key_len, embed_dim]
+        k_n = k_n.view(batch_size, key_len, self.num_heads, self.head_embed_size)
+        # k_n.size =  [batch_size, key_len, self.num_heads, self.head_embed_size]
+        k_n = k_n.transpose(1, 2)
+        # k_n.size =  [batch_size, num_heads, key_len, self.head_embed_size]
+        
+        v_n = self.v_proj(value)
+        # v_n.size =  [batch_size, value_len, embed_dim]
+        v_n = v_n.view(batch_size, value_len, self.num_heads, self.head_embed_size)
+        # v_n.size =  [batch_size, value_len, self.num_heads, self.head_embed_size]
+        v_n = v_n.transpose(1, 2)
+        # v_n.size =  [batch_size, self.num_heads, value_len, self.head_embed_size]
+       
+        queries = q_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)  # turn to batch (parallel)
+        # queries.size = [batch_size * self.num_heads, tgt_time_steps, self.head_embed_size]
+        keys = k_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)
+        # keys.size = [batch_size * self.num_heads, key_len, self.head_embed_size]
+        values = v_n.contiguous().view(batch_size * self.num_heads, -1, self.head_embed_size)
+        # values.size = [batch_size * self.num_heads, value_len, self.head_embed_size]
+        
+        # 2. compute scaled dot-product
+        keys = keys.transpose(1,2)
+        # keys.size = [batch_size * self.num_heads, self.head_embed_size, key_len]
+        score = torch.bmm(queries, keys)) / self.head_scaling  # (b*n, q, d) @ (b*n, d, k) / scale
+        # score.size = [batch_size * self.num_heads, tgt_time_steps, key_len]
 
         if key_padding_mask is not None:
-            # key_padding_mask: [batch_size, src_time_steps]
-            key_padding_mask = key_padding_mask.unsqueeze(1).unsqueeze(2) 
-            # key_padding_mask: [batch_size, num_heads, tgt_time_steps, src_time_steps]
+            key_padding_mask = key_padding_mask.unsqueeze(1) 
+            # key_padding_mask.size = [batch_size, 1, key_len]
+            key_padding_mask = key_padding_mask.repeat(self.num_heads, 1, 1) # repeat (heads,1,1) times on corresponded dimension
+            # key_padding_mask.size = [batch_size * self.num_heads, 1, key_len]
             score = score.masked_fill_(key_padding_mask, float('-inf')) # replace valus with '-inf' in places where key_padding_mask == True
+            # score.size = [batch_size * self.num_heads, tgt_time_steps, key_len]
+            
         if attn_mask is not None:
-            # attn_mask: [tgt_time_steps, tgt_time_steps]
-            attn_mask = attn_mask.unsqueeze(0).unsqueeze(1)
-            # attn_mask: [batch_size, num_heads, tgt_time_steps, tgt_time_steps]
+            attn_mask = attn_mask.unsqueeze(0)
+            # attn_mask.size() = [1, tgt_time_steps, tgt_time_steps]
             score = score + attn_mask
+            # score.size = [batch_size *self.num_heads, tgt_time_steps, key_len]
 
         normalized_score = F.softmax(score, dim=-1)
-        # normalized_score: [batch_size, num_heads, q_len, k_len]
-        attn_weights = torch.bmm(normalized_score.view(batch_size * self.num_heads, tgt_time_steps, keys.size(1)), values)
-        # attn_weights: [batch_size * num_heads, q_len, head_embed_size]
+        # normalized_score.size = [batch_size * num_heads, tgt_time_steps, key_len]
+        attn_weights = torch.bmm(normalized_score, values)
+        # attn_weights.size = [batch_size * self.num_heads, tgt_time_steps, self.head_embed_size]
         attn_weights = attn_weights.view(batch_size, self.num_heads, tgt_time_steps, self.head_embed_size)
-        attn = self.out_proj(attn_weights.transpose(1, 2).contiguous().view(batch_size, tgt_time_steps, self.embed_dim)) # concat and project
-        # attn: [batch_size, q_len, embed_dim]
+        # attn_weights.size = [batch_size, self.num_heads, tgt_time_steps, self.head_embed_size]
+        
+        # 3. concat and project
+        attn = self.out_proj(attn_weights.transpose(1, 2).contiguous().view(batch_size, tgt_time_steps, embed_dim))
+        # [batch_size, self.num_heads, tgt_time_steps, self.head_embed_size]->[batch_size, tgt_time_steps, self.num_heads, self.head_embed_size] 
+        # -> attn.size = [batch_size, tgt_time_steps, embed_dim]
 
         attn_weights = attn_weights.transpose(0, 1)
-        # attn_weights: [num_heads, batch_size, q_len, head_embed_size]
+        # attn_weights.size = [self.num_heads, batch_size, tgt_time_steps, self.head_embed_size]
         attn = attn.transpose(0, 1)
-        # attn: [q_len, batch_size, embed_dim]
+        # attn.size = [tgt_time_steps, batch_size, embed_dim]
 
         # TODO: --------------------------------------------------------------------- CUT
 
