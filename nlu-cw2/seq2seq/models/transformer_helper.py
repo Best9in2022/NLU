@@ -238,14 +238,14 @@ class MultiHeadAttention(nn.Module):
         
         k_n = self.k_proj(key)
         # k_n.size =  [batch_size, key_len, embed_dim]
-        k_n = k_n.view(batch_size, key_len, self.num_heads, self.head_embed_size)
+        k_n = k_n.view(batch_size, key.size(1), self.num_heads, self.head_embed_size)
         # k_n.size =  [batch_size, key_len, self.num_heads, self.head_embed_size]
         k_n = k_n.transpose(1, 2)
         # k_n.size =  [batch_size, num_heads, key_len, self.head_embed_size]
         
         v_n = self.v_proj(value)
         # v_n.size =  [batch_size, value_len, embed_dim]
-        v_n = v_n.view(batch_size, value_len, self.num_heads, self.head_embed_size)
+        v_n = v_n.view(batch_size, value.size(1), self.num_heads, self.head_embed_size)
         # v_n.size =  [batch_size, value_len, self.num_heads, self.head_embed_size]
         v_n = v_n.transpose(1, 2)
         # v_n.size =  [batch_size, self.num_heads, value_len, self.head_embed_size]
