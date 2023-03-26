@@ -176,7 +176,7 @@ class AttentionLayer(nn.Module):
                 sent_tensor = create_sentence_tensor(...) 
                 # sent_tensor.size = [batch, sent_len, hidden]
         2.  Why do we need to apply a mask to the attention scores?
-            ------------A: To keep model from copying the 'future' words during training through paying attention to them
+            A: To keep model from copying the 'future' words during training through paying attention to them
         '''
         if src_mask is not None:
             src_mask = src_mask.unsqueeze(dim=1)  # src_mask.size = [batch, 1, src_time_steps]
@@ -198,7 +198,7 @@ class AttentionLayer(nn.Module):
         ___QUESTION-1-DESCRIBE-B-START___
         1.  Add tensor shape annotation to each of the output tensor
         2.  How are attention scores calculated? 
-        ---------A: dot-product between target input from one time point and all the hidden states obtained from the encoder
+        A: dot-product between target input from one time point and all the hidden states obtained from the encoder
         '''
         projected_encoder_out = self.src_projection(encoder_out).transpose(2, 1) # projected_encoder_out.size = [batch_size, output_dims, src_time_steps]
         attn_scores = torch.bmm(tgt_input.unsqueeze(dim=1), projected_encoder_out) # attn_scores.size = [batch_size, 1, src_time_steps]
@@ -277,9 +277,9 @@ class LSTMDecoder(Seq2SeqDecoder):
         '''
         ___QUESTION-1-DESCRIBE-C-START___
         1.  When is cached_state == None? 
-        -----------A: when initializing the LSTM decoder
+        A: when initializing the LSTM decoder
         2.  What role does input_feed play?
-        -----------A: as recurrent for the current time step, including all the information from the previous tokens generated from the decoder
+        A: as recurrent for the current time step, including all the information from the previous tokens generated from the decoder
         '''
         cached_state = utils.get_incremental_state(self, incremental_state, 'cached_state')
         if cached_state is not None:
@@ -327,15 +327,19 @@ class LSTMDecoder(Seq2SeqDecoder):
                 if self.use_lexical_model:
                     # __QUESTION-4: Compute and collect LEXICAL MODEL context vectors here
                     # TODO: --------------------------------------------------------------------- CUT
+                    #score = step_attn_weights.unsqueeze(1)
+                    #src = torch.transpose(src_embeddings, 0, 1) # [n, t_in, d]
+               
+                    #src_c = torch.tanh(torch.bmm(score, src)).squeeze(1) # [n, 1, d]  
+                    
+                    # FFNN + Residual
+                    #src_out = torch.tanh(self.lexical_model(src_c)) + src_c
+                    #lexical_contexts.append(src_out) # [n, d]
+                    
                     score = step_attn_weights.unsqueeze(1)
-                    # src_embeddings = [src_time_steps,batchsize,embed_dim]
-                    # f_s = [batchsize, src_time_steps,embed_dim]
                     f_s = torch.transpose(src_embeddings, 0, 1)
-                    # f_t squeeze : [batchsize,1,embed_dim] -> [batchsize,embed_dim]
                     f_t = torch.tanh(torch.bmm(score, f_s)).squeeze(1)
-                    # h_t = [batchsize, embed_dim]
                     h_t = torch.tanh(self.lexical_model(f_t)) + f_t
-                    # lexical_contexts = [src_time_steps,batchsize, embed_dim]
                     lexical_contexts.append(h_t)
                     # TODO: --------------------------------------------------------------------- /CUT
 
@@ -359,20 +363,16 @@ class LSTMDecoder(Seq2SeqDecoder):
         if self.use_lexical_model:
             # __QUESTION-4: Incorporate the LEXICAL MODEL into the prediction of target tokens here
             # TODO: --------------------------------------------------------------------- CUT
-            predict_output = torch.stack(lexical_contexts).transpose(0,1)
-            #print(predict_output.size())
-
+            context_output = torch.stack(lexical_contexts)
+            context_output = context_output.transpose(0, 1) # [n, tgt_time_steps, d]
             # normalize
             #context_output_norm = F.normalize(context_output, p=2, dim=-1)
-
-            # context_proj = self.lexical_projection(predict_output)  # [n, tgt_time_steps, V]
-
+            context_output = self.lexical_projection(context_output)  # [n, tgt_time_steps, V]
             # normalize
             #decoder_output_norm = torch.cat(rnn_outputs, dim=0).view(tgt_time_steps, batch_size, self.hidden_size)
             #decoder_output_norm = decoder_output.transpose(0, 1)
             #decoder_output_norm = F.normalize(decoder_output_norm, p=2, dim=-1)
-
-            decoder_output +=self.lexical_projection(predict_output) 
+            decoder_output = decoder_output + context_output
             
 #             self.linear = nn.Linear(embedding_dim, output_dim)
 #             self.linear.weight.data.normal_(0, 1)  # initialize weights
