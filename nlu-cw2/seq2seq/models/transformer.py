@@ -207,6 +207,7 @@ class TransformerDecoder(Seq2SeqDecoder):
             does not contain the words after the current word, wo do not need to use self_attn_mask. 
             '''
             self_attn_mask = self.buffered_future_mask(forward_state) if incremental_state is None else None
+            # print(self_attn_mask.size(), encoder_state.size(), tgt_inputs.size())
             # self_attn_mask: [tgt_time_steps(q_len), src_time_steps(k_len)->tgt_time_steps(q_len)]
             '''
             ___QUESTION-5-DESCRIBE-B-END___

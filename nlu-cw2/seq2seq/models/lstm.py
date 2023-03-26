@@ -327,13 +327,16 @@ class LSTMDecoder(Seq2SeqDecoder):
                 if self.use_lexical_model:
                     # __QUESTION-4: Compute and collect LEXICAL MODEL context vectors here
                     # TODO: --------------------------------------------------------------------- CUT
-                    src_embeddings_copy = src_embeddings.tranpose(0,1) # [n, t_in, d]
-                    src_context = torch.bmm(step_attn_weights.unsqueeze(1), src_embeddings_copy) # [n, 1, d]
-                    src_context = nn.tanh(src_context.squeeze(1)) # [n, d]
-                    
-                    # FFNN + Residual
-                    scr_out = nn.tanh(self.lexical_model(src_context)) + src_context
-                    lexical_contexts.append(src_out) # [n, d]
+                    score = step_attn_weights.unsqueeze(1)
+                    # src_embeddings = [src_time_steps,batchsize,embed_dim]
+                    # f_s = [batchsize, src_time_steps,embed_dim]
+                    f_s = torch.transpose(src_embeddings, 0, 1)
+                    # f_t squeeze : [batchsize,1,embed_dim] -> [batchsize,embed_dim]
+                    f_t = torch.tanh(torch.bmm(score, f_s)).squeeze(1)
+                    # h_t = [batchsize, embed_dim]
+                    h_t = torch.tanh(self.lexical_model(f_t)) + f_t
+                    # lexical_contexts = [src_time_steps,batchsize, embed_dim]
+                    lexical_contexts.append(h_t)
                     # TODO: --------------------------------------------------------------------- /CUT
 
             input_feed = F.dropout(input_feed, p=self.dropout_out, training=self.training)
@@ -356,16 +359,20 @@ class LSTMDecoder(Seq2SeqDecoder):
         if self.use_lexical_model:
             # __QUESTION-4: Incorporate the LEXICAL MODEL into the prediction of target tokens here
             # TODO: --------------------------------------------------------------------- CUT
-            context_output = torch.stack(lexical_contexts)
-            context_output = context_output.transpose(0, 1) # [n, tgt_time_steps, d]
+            predict_output = torch.stack(lexical_contexts).transpose(0,1)
+            #print(predict_output.size())
+
             # normalize
             #context_output_norm = F.normalize(context_output, p=2, dim=-1)
-            context_output = self.lexical_projection(context_output)  # [n, tgt_time_steps, V]
+
+            # context_proj = self.lexical_projection(predict_output)  # [n, tgt_time_steps, V]
+
             # normalize
             #decoder_output_norm = torch.cat(rnn_outputs, dim=0).view(tgt_time_steps, batch_size, self.hidden_size)
             #decoder_output_norm = decoder_output.transpose(0, 1)
             #decoder_output_norm = F.normalize(decoder_output_norm, p=2, dim=-1)
-            decoder_output = decoder_output + context_output
+
+            decoder_output +=self.lexical_projection(predict_output) 
             
 #             self.linear = nn.Linear(embedding_dim, output_dim)
 #             self.linear.weight.data.normal_(0, 1)  # initialize weights
